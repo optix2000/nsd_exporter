@@ -1,0 +1,102 @@
+metrics:
+# NSD Metrics
+# Taken from https://www.nlnetlabs.nl/projects/nsd/nsd-control.8.html "STATISTIC COUNTERS"
+  num.queries:
+    help: 'number of queries received (the tcp and udp queries added up).'
+    type: counter
+  time.boot:
+    help: 'uptime in seconds since the server was started. With fractional seconds.'
+    type: gauge
+  time.elapsed:
+    help: 'time since the last stats report, in seconds. With  fractional seconds.'
+    type: gauge
+  size.db.disk:
+    help: 'size of nsd.db on disk, in bytes.'
+    type: gauge
+  size.db.mem:
+    help: 'size of the DNS database in memory, in bytes.'
+    type: gauge
+  size.xfrd.mem:
+    help: 'size of memory for zone transfers and notifies in xfrd process, excludes TSIG data, in bytes.'
+    type: gauge
+  size.config.disk:
+    help: 'size of zonelist file on disk, excludes the nsd.conf size, in bytes.'
+    type: gauge
+  size.config.mem:
+    help: 'size of config data in memory, kept twice in server and xfrd process, in bytes.'
+    type: gauge
+  num.edns:
+    help: 'number of queries with EDNS OPT.'
+    type: counter
+  num.ednserr:
+    help: 'number of queries which failed EDNS parse.'
+    type: counter
+  num.udp:
+    help: 'number of queries over UDP ip4.'
+    type: counter
+  num.udp6:
+    help: 'number of queries over UDP ip6.'
+    type: counter
+  num.tcp:
+    help: 'number of connections over TCP ip4.'
+    type: counter
+  num.tcp6:
+    help: 'number of connections over TCP ip6.'
+    type: counter
+  num.answer_wo_aa:
+    help: 'number of answers with NOERROR rcode and without AA flag, this includes the referrals.'
+    type: counter
+  num.rxerr:
+    help: 'number of queries for which the receive failed.'
+    type: counter
+  num.txerr:
+    help: 'number of answers for which the transmit failed.'
+    type: counter
+  num.raxfr:
+    help: 'number of AXFR requests from clients (that got served with reply).'
+    type: counter
+  num.truncated:
+    help: 'number of answers with TC flag set.'
+    type: counter
+  num.dropped:
+    help: 'number of queries that were dropped because they failed sanity check.'
+    type: counter
+  zone.master:
+    help: 'number of master zones served. These are zones with no "request-xfr" entries.'
+    type: counter
+  zone.slave:
+    help: 'number of slave zones served. These are zones with "request-xfr" entries.'
+    type: counter
+# Metrics that have labels based on some regex value
+# The capture group index should match the index of the label name under labels
+label_metrics:
+  num\.type\.(\w+):
+    name: num_type
+    labels:
+      - type
+    help: 'number of queries with this query type.'
+    type: counter
+  num\.opcode\.(\w+):
+    name: num_opcode
+    labels:
+      - type
+    help: 'number of queries with this opcode.'
+    type: counter
+  num\.class\.(\w+):
+    name: num_class
+    labels:
+      - class
+    help: 'number of queries with this query class.'
+    type: counter
+  num\.rcode\.(\w+):
+    name: num_rcode
+    labels:
+      - rcode
+    help: 'number of answers that carried this return code.'
+    type: counter
+  server(\d+)\.queries:
+    name: server_queries
+    labels:
+      - server
+    help: 'number of queries handled by the server process.'
+    type: counter
