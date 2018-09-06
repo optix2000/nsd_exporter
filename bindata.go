@@ -83,7 +83,7 @@ func configYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config.yaml", size: 3191, mode: os.FileMode(420), modTime: time.Unix(1521253698, 0)}
+	info := bindataFileInfo{name: "config.yaml", size: 3191, mode: os.FileMode(420), modTime: time.Unix(1521586340, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

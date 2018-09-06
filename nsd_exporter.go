@@ -8,8 +8,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/user"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/optix2000/go-nsdctl"
 	"github.com/prometheus/client_golang/prometheus"
@@ -17,6 +21,7 @@ import (
 )
 
 // Args
+var unprivUser = flag.String("user", "nobody", "User to drop privileges to (if running as root). Defaults to nobody")
 var listenAddr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrocs to.")
 var metricConfigPath = flag.String("metric-config", "", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes")
@@ -234,7 +239,29 @@ func main() {
 		}
 	}
 	prometheus.MustRegister(nsdCollector)
-	log.Println("Started.")
 	http.Handle(*metricPath, promhttp.Handler())
+	log.Println("Started.")
+
+	if os.Getuid() == 0 {
+		log.Println("Dropping privileges...")
+		usr, err := user.Lookup(*unprivUser)
+		if err != nil {
+			log.Fatal(err)
+		}
+		uid, err := strconv.ParseInt(usr.Uid, 10, 32)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println(uid)
+		_, _, errno := syscall.Syscall(syscall.SYS_SETUID, uintptr(uid), 0, 0)
+		if errno != 0 {
+			log.Fatal(err)
+		}
+		log.Println("done suid")
+	}
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
+}
+
+func init() {
+	runtime.LockOSThread()
 }
