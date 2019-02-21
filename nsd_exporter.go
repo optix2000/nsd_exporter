@@ -58,7 +58,7 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 	s := bufio.NewScanner(r)
 	for s.Scan() {
 		line := strings.Split(s.Text(), "=")
-		metricName := line[0]
+		metricName := strings.TrimSpace(line[0])
 		m, ok := c.metrics[metricName]
 		if !ok {
 			log.Println("Unknown Metric ", metricName, ". Skipping.")
