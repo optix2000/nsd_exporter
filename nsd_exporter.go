@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/optix2000/go-nsdctl"
 	"github.com/prometheus/client_golang/prometheus"
@@ -240,25 +240,23 @@ func main() {
 	}
 	prometheus.MustRegister(nsdCollector)
 	http.Handle(*metricPath, promhttp.Handler())
-	log.Println("Started.")
 
 	if os.Getuid() == 0 {
-		log.Println("Dropping privileges...")
+		log.Println("Dropping privileges.")
 		usr, err := user.Lookup(*unprivUser)
 		if err != nil {
 			log.Fatal(err)
 		}
-		uid, err := strconv.ParseInt(usr.Uid, 10, 32)
+		uid, err := strconv.Atoi(usr.Uid)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println(uid)
-		_, _, errno := syscall.Syscall(syscall.SYS_SETUID, uintptr(uid), 0, 0)
-		if errno != 0 {
+		err = unix.Setuid(uid)
+		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println("done suid")
 	}
+	log.Println("Started.")
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
