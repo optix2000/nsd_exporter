@@ -1,0 +1,18 @@
+---
+language: go
+
+go:
+  - 1.11.x
+  - 1.12.x
+  - 1.x
+
+env:
+  - GOOS=linux
+  - GOOS=freebsd
+  - GOARCH=386
+  - GOARCH=amd64
+  - GOARCH=arm64
+  - GOARCH=arm
+
+script:
+  - go build .
