@@ -2,8 +2,8 @@
 language: go
 
 go:
-  - 1.11.x
   - 1.12.x
+  - 1.11.x
   - 1.x
 
 env:
@@ -19,6 +19,13 @@ env:
     - GOOS=freebsd GOARCH=arm
     - GOOS=freebsd GOARCH=arm64
 
+cache:
+  directories:
+    - vendor
+
+before_cache:
+  - go mod tidy
 
 script:
-  - go build .
+  - go mod vendor
+  - go build -mod vendor .
