@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"golang.org/x/sys/unix"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/user"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -22,6 +22,7 @@ import (
 
 // Args
 var unprivUser = flag.String("user", "nobody", "User to drop privileges to (if running as root). Defaults to nobody")
+var unprivGroup = flag.String("group", "nogroup", "Group to drop privileges to (if running as root). Defaults to nogroup")
 var listenAddr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrocs to.")
 var metricConfigPath = flag.String("metric-config", "", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes")
@@ -241,9 +242,20 @@ func main() {
 	prometheus.MustRegister(nsdCollector)
 	http.Handle(*metricPath, promhttp.Handler())
 
+	// Bind port before dropping privileges
+	listener, err := net.Listen("tcp", *listenAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Drop privileges
 	if os.Getuid() == 0 {
 		log.Println("Dropping privileges.")
 		usr, err := user.Lookup(*unprivUser)
+		if err != nil {
+			log.Fatal(err)
+		}
+		grp, err := user.LookupGroup(*unprivGroup)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -251,15 +263,27 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = unix.Setuid(uid)
+		gid, err := strconv.Atoi(grp.Gid)
 		if err != nil {
 			log.Fatal(err)
 		}
+		if gid != 0 {
+			err = unix.Setgid(gid)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			log.Println("Warning: Group set to root and running as root. Not dropping privileges. This is dangerous and insecure.")
+		}
+		if uid != 0 {
+			err = unix.Setuid(uid)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			log.Println("Warning: User set to root and running as root. Not dropping privileges. This is dangerous and insecure.")
+		}
 	}
 	log.Println("Started.")
-	log.Fatal(http.ListenAndServe(*listenAddr, nil))
-}
-
-func init() {
-	runtime.LockOSThread()
+	log.Fatal(http.Serve(listener, nil))
 }
