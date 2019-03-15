@@ -98,7 +98,7 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 func (c *NSDCollector) updateMetric(s string) error {
 	// Assume line is in "metric=#" format
 	line := strings.Split(s, "=")
-	metricName := line[0]
+	metricName := strings.TrimSpace(line[0])
 
 	_, exists := c.metrics[metricName]
 	if !exists {
