@@ -1,6 +1,6 @@
 metrics:
 # NSD Metrics
-# Taken from https://www.nlnetlabs.nl/projects/nsd/nsd-control.8.html "STATISTIC COUNTERS"
+# Taken from https://nlnetlabs.nl/documentation/nsd/nsd-control/ "STATISTIC COUNTERS"
   num.queries:
     help: 'number of queries received (the tcp and udp queries added up).'
     type: counter
@@ -8,7 +8,7 @@ metrics:
     help: 'uptime in seconds since the server was started. With fractional seconds.'
     type: gauge
   time.elapsed:
-    help: 'time since the last stats report, in seconds. With  fractional seconds.'
+    help: 'time since the last stats report, in seconds. With fractional seconds.'
     type: gauge
   size.db.disk:
     help: 'size of nsd.db on disk, in bytes.'
@@ -67,6 +67,19 @@ metrics:
   zone.slave:
     help: 'number of slave zones served. These are zones with "request-xfr" entries.'
     type: counter
+# Unbound Metrics
+# Taken from https://nlnetlabs.nl/documentation/unbound/unbound-control/ "STATISTIC COUNTERS"
+  time.now:
+    help: 'current time in seconds since 1970.'
+    type: gauge
+  time.up:
+    help: 'uptime since server boot in seconds.'
+    type: gauge
+# Dupe metric in NSD
+#  time.elapsed:
+#    help: 'time since last statistics printout, in seconds.'
+#    type: gauge
+
 # Metrics that have labels based on some regex value
 # The capture group index should match the index of the label name under labels
 label_metrics:
