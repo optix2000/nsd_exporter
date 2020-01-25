@@ -18,7 +18,7 @@ import (
 
 // Args
 var listenAddr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
-var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrocs to.")
+var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrics to.")
 var metricConfigPath = flag.String("metric-config", "", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes")
 var nsdConfig = flag.String("config-file", "/etc/nsd/nsd.conf", "Configuration file for nsd/unbound to autodetect configuration from. Defaults to /etc/nsd/nsd.conf. Mutually exclusive with -nsd-address, -cert, -key and -ca")
 var nsdType = flag.String("type", "nsd", "What nsd-like daemon to scrape (nsd or unbound). Defaults to nsd")
