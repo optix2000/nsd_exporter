@@ -30,6 +30,11 @@ var nsdAddr = flag.String("nsd-address", "", "NSD or Unbound control socket addr
 // Prom stuff
 var nsdToProm = strings.NewReplacer(".", "_")
 
+var nsdUpDesc = prometheus.NewDesc(
+	prometheus.BuildFQName("nsd", "", "up"),
+	"Whether scraping nsd's metrics was successful.",
+	nil, nil)
+
 var metricConfiguration = &metricConfig{}
 
 type NSDCollector struct {
@@ -44,6 +49,7 @@ type promMetric struct {
 }
 
 func (c *NSDCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- nsdUpDesc
 	for _, metric := range c.metrics {
 		ch <- metric.desc
 	}
@@ -52,9 +58,17 @@ func (c *NSDCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 	r, err := c.client.Command("stats_noreset")
 	if err != nil {
+		ch <- prometheus.MustNewConstMetric(
+			nsdUpDesc,
+			prometheus.GaugeValue,
+			0.0)
 		log.Println(err)
 		return
 	}
+	ch <- prometheus.MustNewConstMetric(
+		nsdUpDesc,
+		prometheus.GaugeValue,
+		1.0)
 
 	s := bufio.NewScanner(r)
 	for s.Scan() {
