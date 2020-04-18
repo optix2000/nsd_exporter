@@ -24,7 +24,7 @@ You will need to launch the process as a user that has permissions to the NSD co
 ### Add/Modify metrics
 If `nsd` has a new version with new metrics or you want to change the description of the existing metrics, you can make changes to the metrics that `nsd_exporter` emits by using your own metrics config file.
 
-1. Download the metrics config from [`config/config.yaml`](https://raw.githubusercontent.com/optix2000/nsd_exporter/ci-swap/config/config.yaml)
+1. Download the metrics config from [`config/config.yaml`](https://raw.githubusercontent.com/optix2000/nsd_exporter/master/config/config.yaml)
 2. Make any additions or modifications you want.
 3. Load it by running `nsd_exporter -metric-config my-custom-config.yaml`. This will use your config instead of the internal metrics config file.
 
