@@ -61,6 +61,12 @@ metrics:
   num.dropped:
     help: 'number of queries that were dropped because they failed sanity check.'
     type: counter
+  num.tls:
+    help: 'number of connections over TLS ip4.  TLS queries are not part of num.tcp.'
+    type: counter
+  num.tls6:
+    help: 'number of connections over TLS ip6.  TLS queries are not part of num.tcp6.'
+    type: counter
   zone.master:
     help: 'number of master zones served. These are zones with no "request-xfr" entries.'
     type: counter
@@ -99,4 +105,10 @@ label_metrics:
     labels:
       - server
     help: 'number of queries handled by the server process.'
+    type: counter
+  zone\.soa\.(.*):
+    name: zone_soa
+    labels:
+      - zone
+    help: 'dns zone soa record.'
     type: counter
