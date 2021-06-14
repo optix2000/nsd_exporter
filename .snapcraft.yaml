@@ -1,0 +1,35 @@
+name: nsd-exporter
+base: core20
+version: git
+grade: stable
+summary: Prometheus exporter for NSD (Name Server Daemon)
+description: |-
+ Prometheus exporter for NSD (Name Server Daemon)
+
+confinement: strict
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+  - build-on: armhf
+  - build-on: ppc64el
+  - build-on: s390x
+
+apps:
+  nsd-exporter:
+    command: daemon.start
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+
+parts:
+  nsd-exporter:
+    source: .
+    plugin: go
+    prime:
+      - bin/nsd_exporter
+
+  wrappers:
+    plugin: dump
+    source: .snapcraft/
