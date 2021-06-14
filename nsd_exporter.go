@@ -238,7 +238,7 @@ func main() {
 				log.Fatal(err)
 			}
 		} else {
-			log.Fatal("-cert, -key, and -ca must all be defined.")
+			log.Fatal("-nsd-address, -cert, -key, and -ca must all be defined.")
 		}
 	} else {
 		// Build from config
