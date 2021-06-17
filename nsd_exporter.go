@@ -6,8 +6,10 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -54,8 +56,40 @@ func (c *NSDCollector) Describe(ch chan<- *prometheus.Desc) {
 		ch <- metric.desc
 	}
 }
+func CollectZone(str string) string {
+	var re = regexp.MustCompile(`(?m)zone:\s+(?P<zone>.*)\n\s+state:\s(?P<state>\w+)\n\s+served-serial:\s(?P<served_serial>(\w+)|("(?P<served_soa>\d+)\ssince\s(?P<served_soa_date>.*)"))\n\s+commit-serial:\s(?P<commit_serial>(\w+)|("(?P<commit_soa>\d+)\ssince\s(?P<commit_soa_date>.*)"))\n\s+((wait:\s"(?P<wait>.*)")|notified-serial:\s"(?P<notified_serial>.*)"\n\s+transfer:\s"TCP\sconnected\sto\s(?P<transfer_ip>.*)")?`)
+	lmatch := re.FindAllStringSubmatch(str, -1)
+	var ret string
+	var zone string
+	var soa string
+	for _, match := range lmatch {
+		for i, name := range re.SubexpNames() {
+			if i != 0 && name == "zone" {
+				zone = match[i]
+			} else if name == "served_soa" {
+				if match[i] == "" {
+					soa = "0"
+				} else {
+					soa = match[i]
+				}
+			}
+		}
+		ret = ret + "zone.soa." + zone + "=" + soa + "\n"
+	}
+	if len(ret) == 0 {
+		return ""
+	}
+	return ret
+}
 
 func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
+	z, err := c.client.Command("zonestatus")
+	zonestatus, err := ioutil.ReadAll(z)
+	if err != nil {
+		log.Println(err)
+	}
+	zone := CollectZone(string(zonestatus))
+
 	r, err := c.client.Command("stats_noreset")
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(
@@ -70,7 +104,12 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 		prometheus.GaugeValue,
 		1.0)
 
-	s := bufio.NewScanner(r)
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		zone = zone + sc.Text() + "\n"
+	}
+	s := bufio.NewScanner(strings.NewReader(zone))
+
 	for s.Scan() {
 		line := strings.Split(s.Text(), "=")
 		metricName := strings.TrimSpace(line[0])
@@ -152,7 +191,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 					goto Found
 				}
 			}
-			return fmt.Errorf("Metric ", metricName, " not found in config.")
+			return fmt.Errorf("Metric %v %v", metricName, " not found in config.")
 		Found:
 		}
 	}
