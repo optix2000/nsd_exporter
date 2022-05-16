@@ -34,7 +34,7 @@ This is only needed if you want to modify the embedded metric configuration file
 
 Install go-bindata.
 ```
-go get -u github.com/go-bindata/go-bindata/go-bindata
+go install github.com/go-bindata/go-bindata/go-bindata@latest
 ```
 Make any metric config modifications to `config/config.yaml`.
 

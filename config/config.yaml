@@ -1,6 +1,6 @@
 metrics:
 # NSD Metrics
-# Taken from https://www.nlnetlabs.nl/projects/nsd/nsd-control.8.html "STATISTIC COUNTERS"
+# Taken from https://nsd.docs.nlnetlabs.nl/en/latest/manpages/nsd-control.html#statistics-counters
   num.queries:
     help: 'number of queries received (the tcp and udp queries added up).'
     type: counter
@@ -42,6 +42,12 @@ metrics:
     type: counter
   num.tcp6:
     help: 'number of connections over TCP ip6.'
+    type: counter
+  num.tls:
+    help: 'number of connections over TLS ip4. TLS queries are not part of num.tcp.'
+    type: counter
+  num.tls6:
+    help: 'number of connections over TLS ip6. TLS queries are not part of num.tcp6.'
     type: counter
   num.answer_wo_aa:
     help: 'number of answers with NOERROR rcode and without AA flag, this includes the referrals.'
