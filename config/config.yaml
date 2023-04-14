@@ -61,6 +61,9 @@ metrics:
   num.raxfr:
     help: 'number of AXFR requests from clients (that got served with reply).'
     type: counter
+  num.rixfr:
+    help: 'number of IXFR requests from clients (that got served with reply).'
+    type: counter
   num.truncated:
     help: 'number of answers with TC flag set.'
     type: counter
