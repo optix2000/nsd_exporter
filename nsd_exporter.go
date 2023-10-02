@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,21 +9,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log/level"
 	"github.com/optix2000/go-nsdctl"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/version"
+	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 )
-
-// Args
-var listenAddr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
-var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrics to.")
-var metricConfigPath = flag.String("metric-config", "", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes")
-var nsdConfig = flag.String("config-file", "/etc/nsd/nsd.conf", "Configuration file for nsd/unbound to autodetect configuration from. Defaults to /etc/nsd/nsd.conf. Mutually exclusive with -nsd-address, -cert, -key and -ca")
-var nsdType = flag.String("type", "nsd", "What nsd-like daemon to scrape (nsd or unbound). Defaults to nsd")
-var cert = flag.String("cert", "", "Client cert file location. Mutually exclusive with -config-file.")
-var key = flag.String("key", "", "Client key file location. Mutually exclusive with -config-file.")
-var ca = flag.String("ca", "", "Server CA file location. Mutually exclusive with -config-file.")
-var nsdAddr = flag.String("nsd-address", "", "NSD or Unbound control socket address.")
 
 // Prom stuff
 var nsdToProm = strings.NewReplacer(".", "_")
@@ -39,6 +34,7 @@ var metricConfiguration = &metricConfig{}
 type NSDCollector struct {
 	client  *nsdctl.NSDClient
 	metrics map[string]*promMetric // Map of metric names to prom metrics
+	typ     string
 }
 
 type promMetric struct {
@@ -120,7 +116,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 			promName := nsdToProm.Replace(line[0])
 			c.metrics[metricName] = &promMetric{
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName(*nsdType, "", promName),
+					prometheus.BuildFQName(c.typ, "", promName),
 					metricConf.Help,
 					nil,
 					nil,
@@ -139,7 +135,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 					}
 					c.metrics[metricName] = &promMetric{
 						desc: prometheus.NewDesc(
-							prometheus.BuildFQName(*nsdType, "", promName),
+							prometheus.BuildFQName(c.typ, "", promName),
 							v.Help,
 							v.Labels,
 							nil,
@@ -188,6 +184,7 @@ func NewNSDCollector(nsdType string, hostString string, caPath string, keyPath s
 
 	collector := &NSDCollector{
 		client: client,
+		typ:    nsdType,
 	}
 
 	err = collector.initMetricsList()
@@ -206,6 +203,7 @@ func NewNSDCollectorFromConfig(path string) (*NSDCollector, error) {
 
 	collector := &NSDCollector{
 		client: client,
+		typ:    "nsd",
 	}
 
 	err = collector.initMetricsList()
@@ -218,7 +216,25 @@ func NewNSDCollectorFromConfig(path string) (*NSDCollector, error) {
 
 // Main
 func main() {
-	flag.Parse()
+	var (
+		metricsPath      = kingpin.Flag("web.telemetry-path", "The path to export Prometheus metrics to.").Default("/metrics").String()
+		metricConfigPath = kingpin.Flag("metrics-config", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes").String()
+		nsdConfig        = kingpin.Flag("nsd.config", "Configuration file for nsd/unbound to autodetect configuration from. Mutually exclusive with --control.address, -control.cert, --control.key and --control.ca").Default("/etc/nsd/nsd.conf").String()
+		nsdType          = kingpin.Flag("type", "What nsd-like daemon to scrape (nsd or unbound). Defaults to nsd").Default("nsd").Enum("nsd", "unbound")
+		nsdAddr          = kingpin.Flag("control.address", "NSD or Unbound control socket address.").String()
+		cert             = kingpin.Flag("control.cert", "Client cert file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		key              = kingpin.Flag("control.key", "Client key file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		ca               = kingpin.Flag("control.ca", "Server CA file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		toolkitFlags     = kingpinflag.AddFlags(kingpin.CommandLine, ":9167")
+	)
+
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	kingpin.Version(version.Print("nsd_exporter"))
+	kingpin.CommandLine.UsageWriter(os.Stdout)
+	kingpin.HelpFlag.Short('h')
+	kingpin.Parse()
+	logger := promlog.New(promlogConfig)
 
 	// Load config
 	err := loadConfig(*metricConfigPath, metricConfiguration)
@@ -238,7 +254,7 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			slog.Error("-nsd-address, -cert, -key, and -ca must all be defined.")
+			slog.Error("--control.address, --control.cert, --control.key, and --control.ca must all be defined.")
 			os.Exit(1)
 		}
 	} else {
@@ -250,14 +266,32 @@ func main() {
 		}
 	}
 
+	level.Info(logger).Log("msg", "Starting nsd_exporter", "version", version.Info())
+	level.Info(logger).Log("msg", "Build context", "context", version.BuildContext())
+
 	prometheus.MustRegister(nsdCollector)
-	slog.Info("Started.")
-	http.Handle(*metricPath, promhttp.Handler())
-	err = http.ListenAndServe(*listenAddr, nil)
+	http.Handle(*metricsPath, promhttp.Handler())
+	if *metricsPath != "/" && *metricsPath != "" {
+		landingPage, err := web.NewLandingPage(
+			web.LandingConfig{
+				Name:        "NSd Exporter",
+				Description: "NSd Exporter for Prometheus",
+				Version:     version.Info(),
+				Links: []web.LandingLinks{
+					{Address: *metricsPath, Text: "Metrics"},
+				},
+			})
+		if err != nil {
+			slog.Error("Failed to create landing page", "err", err)
+			os.Exit(1)
+		}
+		http.Handle("/", landingPage)
+	}
+
+	server := new(http.Server)
+	err = web.ListenAndServe(server, toolkitFlags, logger)
 	if err != nil {
 		slog.Error("Server error", "err", err)
 		os.Exit(1)
-	} else {
-		slog.Debug("Terminating")
 	}
 }
