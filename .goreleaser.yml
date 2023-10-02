@@ -2,7 +2,7 @@ builds:
   -  # First Build
     env:
       - CGO_ENABLED=0
-    main: main.go
+    main: nsd_exporter.go
     ldflags: >-
       -s -w
       -X github.com/prometheus/common/version.Version={{.Version}}
