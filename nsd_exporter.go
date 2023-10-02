@@ -1,7 +1,5 @@
 package main
 
-//go:generate go-bindata --prefix config/ config/
-
 import (
 	"bufio"
 	"flag"
@@ -218,7 +216,6 @@ func NewNSDCollectorFromConfig(path string) (*NSDCollector, error) {
 }
 
 // Main
-
 func main() {
 	flag.Parse()
 
