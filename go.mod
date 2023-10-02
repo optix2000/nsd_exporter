@@ -1,6 +1,6 @@
 module github.com/optix2000/nsd_exporter
 
-go 1.20
+go 1.21
 
 require (
 	github.com/optix2000/go-nsdctl v1.0.0
