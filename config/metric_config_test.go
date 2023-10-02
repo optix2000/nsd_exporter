@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -15,16 +15,16 @@ func TestLoadConfig(t *testing.T) {
 		expectErr error
 	}{
 		{"embed", "", nil},
-		{"file", "config/config.yaml", nil},
-		{"no-file", "config/not-existing.yaml", os.ErrNotExist},
+		{"file", "config.yaml", nil},
+		{"no-file", "not-existing.yaml", os.ErrNotExist},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			mc := new(metricConfig)
-			err := loadConfig(tc.path, mc)
+			mc := new(MetricConfig)
+			err := LoadConfig(tc.path, mc)
 
 			if tc.expectErr != nil {
 				assert.ErrorIs(err, tc.expectErr)

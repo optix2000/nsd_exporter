@@ -19,6 +19,8 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
+
+	"github.com/optix2000/nsd_exporter/config"
 )
 
 // Prom stuff
@@ -29,7 +31,7 @@ var nsdUpDesc = prometheus.NewDesc(
 	"Whether scraping nsd's metrics was successful.",
 	nil, nil)
 
-var metricConfiguration = &metricConfig{}
+var metricConfiguration = &config.MetricConfig{}
 
 type NSDCollector struct {
 	client  *nsdctl.NSDClient
@@ -237,7 +239,7 @@ func main() {
 	logger := promlog.New(promlogConfig)
 
 	// Load config
-	err := loadConfig(*metricConfigPath, metricConfiguration)
+	err := config.LoadConfig(*metricConfigPath, metricConfiguration)
 	if err != nil {
 		slog.Error("Failed to load config", "err", err)
 		os.Exit(1)
