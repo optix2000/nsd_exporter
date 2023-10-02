@@ -266,8 +266,8 @@ func main() {
 		}
 	}
 
-	level.Info(logger).Log("msg", "Starting nsd_exporter", "version", version.Info())
-	level.Info(logger).Log("msg", "Build context", "context", version.BuildContext())
+	_ = level.Info(logger).Log("msg", "Starting nsd_exporter", "version", version.Info())
+	_ = level.Info(logger).Log("msg", "Build context", "context", version.BuildContext())
 
 	prometheus.MustRegister(nsdCollector)
 	http.Handle(*metricsPath, promhttp.Handler())
