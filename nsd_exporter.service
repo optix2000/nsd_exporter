@@ -1,0 +1,17 @@
+[Unit]
+Description=NSd Exporter for Prometheus
+# Documentation=https://github.com/optix2000/nsd_exporter
+Documentation=https://github.com/sardinasystems/nsd_exporter
+After=network.target network-online.target
+
+[Service]
+Type=simple
+#User=prometheus
+User=nsd
+ExecStart=/usr/local/bin/nsd_exporter --control.address 127.0.0.1:8952 --control.ca /etc/nsd/nsd_server.pem --control.key /etc/nsd/nsd_control.key --control.cert /etc/nsd/nsd_control.pem
+
+Restart=always
+WorkingDirectory=/
+
+[Install]
+WantedBy=multi-user.target

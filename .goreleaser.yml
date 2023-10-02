@@ -42,3 +42,4 @@ archives:
     files:
       - LICENSE
       - README.md
+      - nsd_exporter.service
