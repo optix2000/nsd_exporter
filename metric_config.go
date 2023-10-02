@@ -2,7 +2,7 @@ package main
 
 import (
 	"embed"
-	"log"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -44,7 +44,7 @@ type labelMetric struct {
 func stringToPromType(s string) prometheus.ValueType {
 	valueType, ok := stringToValueType[strings.ToLower(s)]
 	if !ok {
-		log.Println("Invalid type:", s, "Assuming Gauge")
+		slog.Warn("Invalid type of metric. Assumed Gauge", "type", s)
 		valueType = prometheus.GaugeValue
 	}
 	return valueType
@@ -91,7 +91,7 @@ func loadConfig(path string, metricConf *metricConfig) error {
 	var err error
 
 	if path == "" {
-		b, err = configFS.ReadFile("config.yaml")
+		b, err = configFS.ReadFile("config/config.yaml")
 		if err != nil {
 			return err
 		}

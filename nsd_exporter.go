@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -60,7 +61,7 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 			nsdUpDesc,
 			prometheus.GaugeValue,
 			0.0)
-		log.Println(err)
+		slog.Error("Stats request failed", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(
@@ -74,34 +75,34 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 		metricName := strings.TrimSpace(line[0])
 		m, ok := c.metrics[metricName]
 		if !ok {
-			log.Println("New metric " + metricName + " found. Refreshing.")
+			slog.Info("New metric found. Refreshing.", "name", metricName)
 			// Try to update the metrics list
 			err = c.updateMetric(s.Text())
 			if err != nil {
-				log.Println(err.Error())
+				slog.Error("Update failed", "err", err)
 			}
 			// Refetch metric
-			m, ok = c.metrics[metricName]
+			_, ok = c.metrics[metricName]
 			if !ok {
-				log.Println("Metric " + metricName + "not configured. Skipping")
+				slog.Warn("Metric not configured. Skipping", "name", metricName)
 			}
 			continue
 		}
 		value, err := strconv.ParseFloat(line[1], 64)
 		if err != nil {
-			log.Println(err)
+			slog.Error("Parse error", "err", err)
 			continue
 		}
 		metric, err := prometheus.NewConstMetric(m.desc, m.valueType, value, m.labels...)
 		if err != nil {
-			log.Println(err)
+			slog.Error("New const metric failed", "err", err)
 			continue
 		}
 		ch <- metric
 	}
 	err = s.Err()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Bufio error", "err", err)
 		return
 	}
 
@@ -144,13 +145,13 @@ func (c *NSDCollector) updateMetric(s string) error {
 							nil,
 						),
 						valueType: v.Type,
-						labels:    labels[1:len(labels)],
+						labels:    labels[1:],
 					}
 					// python "for-else"
 					goto Found
 				}
 			}
-			return fmt.Errorf("Metric ", metricName, " not found in config.")
+			return fmt.Errorf("Metric %s not found in config.", metricName)
 		Found:
 		}
 	}
@@ -160,7 +161,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 func (c *NSDCollector) initMetricsList() error {
 	r, err := c.client.Command("stats_noreset")
 	if err != nil {
-		log.Println(err)
+		slog.Error("Stats request failed", "err", err)
 		return err
 	}
 
@@ -173,7 +174,7 @@ func (c *NSDCollector) initMetricsList() error {
 	for s.Scan() {
 		err = c.updateMetric(s.Text())
 		if err != nil {
-			log.Println(err.Error(), "Skipping.")
+			slog.Error("Bufio failed, Skipping.", "err", err)
 		}
 	}
 	return s.Err()
@@ -191,7 +192,7 @@ func NewNSDCollector(nsdType string, hostString string, caPath string, keyPath s
 
 	err = collector.initMetricsList()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Init failed", "err", err)
 		return nil, err
 	}
 	return collector, err
@@ -209,7 +210,7 @@ func NewNSDCollectorFromConfig(path string) (*NSDCollector, error) {
 
 	err = collector.initMetricsList()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Init failed", "err", err)
 		return nil, err
 	}
 	return collector, err
@@ -222,7 +223,8 @@ func main() {
 	// Load config
 	err := loadConfig(*metricConfigPath, metricConfiguration)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to load config", "err", err)
+		os.Exit(1)
 	}
 
 	// If one is set, all must be set.
@@ -232,20 +234,30 @@ func main() {
 			// Build from arguments
 			nsdCollector, err = NewNSDCollector(*nsdType, *nsdAddr, *ca, *key, *cert, false)
 			if err != nil {
-				log.Fatal(err)
+				slog.Error("Failed to create collector", "err", err)
+				os.Exit(1)
 			}
 		} else {
-			log.Fatal("-nsd-address, -cert, -key, and -ca must all be defined.")
+			slog.Error("-nsd-address, -cert, -key, and -ca must all be defined.")
+			os.Exit(1)
 		}
 	} else {
 		// Build from config
 		nsdCollector, err = NewNSDCollectorFromConfig(*nsdConfig)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed to create collector", "err", err)
+			os.Exit(1)
 		}
 	}
+
 	prometheus.MustRegister(nsdCollector)
-	log.Println("Started.")
+	slog.Info("Started.")
 	http.Handle(*metricPath, promhttp.Handler())
-	log.Fatal(http.ListenAndServe(*listenAddr, nil))
+	err = http.ListenAndServe(*listenAddr, nil)
+	if err != nil {
+		slog.Error("Server error", "err", err)
+		os.Exit(1)
+	} else {
+		slog.Debug("Terminating")
+	}
 }
