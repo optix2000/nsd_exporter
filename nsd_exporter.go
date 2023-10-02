@@ -1,31 +1,27 @@
 package main
 
-//go:generate go-bindata --prefix config/ config/
-
 import (
 	"bufio"
-	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log/level"
 	"github.com/optix2000/go-nsdctl"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/version"
+	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
-// Args
-var listenAddr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
-var metricPath = flag.String("metric-path", "/metrics", "The path to export Prometheus metrics to.")
-var metricConfigPath = flag.String("metric-config", "", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes")
-var nsdConfig = flag.String("config-file", "/etc/nsd/nsd.conf", "Configuration file for nsd/unbound to autodetect configuration from. Defaults to /etc/nsd/nsd.conf. Mutually exclusive with -nsd-address, -cert, -key and -ca")
-var nsdType = flag.String("type", "nsd", "What nsd-like daemon to scrape (nsd or unbound). Defaults to nsd")
-var cert = flag.String("cert", "", "Client cert file location. Mutually exclusive with -config-file.")
-var key = flag.String("key", "", "Client key file location. Mutually exclusive with -config-file.")
-var ca = flag.String("ca", "", "Server CA file location. Mutually exclusive with -config-file.")
-var nsdAddr = flag.String("nsd-address", "", "NSD or Unbound control socket address.")
+	"github.com/optix2000/nsd_exporter/config"
+)
 
 // Prom stuff
 var nsdToProm = strings.NewReplacer(".", "_")
@@ -35,11 +31,12 @@ var nsdUpDesc = prometheus.NewDesc(
 	"Whether scraping nsd's metrics was successful.",
 	nil, nil)
 
-var metricConfiguration = &metricConfig{}
+var metricConfiguration = &config.MetricConfig{}
 
 type NSDCollector struct {
 	client  *nsdctl.NSDClient
 	metrics map[string]*promMetric // Map of metric names to prom metrics
+	typ     string
 }
 
 type promMetric struct {
@@ -62,7 +59,7 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 			nsdUpDesc,
 			prometheus.GaugeValue,
 			0.0)
-		log.Println(err)
+		slog.Error("Stats request failed", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(
@@ -76,34 +73,34 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 		metricName := strings.TrimSpace(line[0])
 		m, ok := c.metrics[metricName]
 		if !ok {
-			log.Println("New metric " + metricName + " found. Refreshing.")
+			slog.Info("New metric found. Refreshing.", "name", metricName)
 			// Try to update the metrics list
 			err = c.updateMetric(s.Text())
 			if err != nil {
-				log.Println(err.Error())
+				slog.Error("Update failed", "err", err)
 			}
 			// Refetch metric
-			m, ok = c.metrics[metricName]
+			_, ok = c.metrics[metricName]
 			if !ok {
-				log.Println("Metric " + metricName + "not configured. Skipping")
+				slog.Warn("Metric not configured. Skipping", "name", metricName)
 			}
 			continue
 		}
 		value, err := strconv.ParseFloat(line[1], 64)
 		if err != nil {
-			log.Println(err)
+			slog.Error("Parse error", "err", err)
 			continue
 		}
 		metric, err := prometheus.NewConstMetric(m.desc, m.valueType, value, m.labels...)
 		if err != nil {
-			log.Println(err)
+			slog.Error("New const metric failed", "err", err)
 			continue
 		}
 		ch <- metric
 	}
 	err = s.Err()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Bufio error", "err", err)
 		return
 	}
 
@@ -121,7 +118,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 			promName := nsdToProm.Replace(line[0])
 			c.metrics[metricName] = &promMetric{
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName(*nsdType, "", promName),
+					prometheus.BuildFQName(c.typ, "", promName),
 					metricConf.Help,
 					nil,
 					nil,
@@ -140,19 +137,19 @@ func (c *NSDCollector) updateMetric(s string) error {
 					}
 					c.metrics[metricName] = &promMetric{
 						desc: prometheus.NewDesc(
-							prometheus.BuildFQName(*nsdType, "", promName),
+							prometheus.BuildFQName(c.typ, "", promName),
 							v.Help,
 							v.Labels,
 							nil,
 						),
 						valueType: v.Type,
-						labels:    labels[1:len(labels)],
+						labels:    labels[1:],
 					}
 					// python "for-else"
 					goto Found
 				}
 			}
-			return fmt.Errorf("Metric ", metricName, " not found in config.")
+			return fmt.Errorf("Metric %s not found in config.", metricName)
 		Found:
 		}
 	}
@@ -162,7 +159,7 @@ func (c *NSDCollector) updateMetric(s string) error {
 func (c *NSDCollector) initMetricsList() error {
 	r, err := c.client.Command("stats_noreset")
 	if err != nil {
-		log.Println(err)
+		slog.Error("Stats request failed", "err", err)
 		return err
 	}
 
@@ -175,7 +172,7 @@ func (c *NSDCollector) initMetricsList() error {
 	for s.Scan() {
 		err = c.updateMetric(s.Text())
 		if err != nil {
-			log.Println(err.Error(), "Skipping.")
+			slog.Error("Bufio failed, Skipping.", "err", err)
 		}
 	}
 	return s.Err()
@@ -189,11 +186,12 @@ func NewNSDCollector(nsdType string, hostString string, caPath string, keyPath s
 
 	collector := &NSDCollector{
 		client: client,
+		typ:    nsdType,
 	}
 
 	err = collector.initMetricsList()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Init failed", "err", err)
 		return nil, err
 	}
 	return collector, err
@@ -207,25 +205,44 @@ func NewNSDCollectorFromConfig(path string) (*NSDCollector, error) {
 
 	collector := &NSDCollector{
 		client: client,
+		typ:    "nsd",
 	}
 
 	err = collector.initMetricsList()
 	if err != nil {
-		log.Println(err)
+		slog.Error("Init failed", "err", err)
 		return nil, err
 	}
 	return collector, err
 }
 
 // Main
-
 func main() {
-	flag.Parse()
+	var (
+		metricsPath      = kingpin.Flag("web.telemetry-path", "The path to export Prometheus metrics to.").Default("/metrics").String()
+		metricConfigPath = kingpin.Flag("metrics-config", "Mapping file for metrics. Defaults to built in file for NSD 4.1.x. This allows you to add or change any metrics that this scrapes").String()
+		nsdConfig        = kingpin.Flag("nsd.config", "Configuration file for nsd/unbound to autodetect configuration from. Mutually exclusive with --control.address, -control.cert, --control.key and --control.ca").Default("/etc/nsd/nsd.conf").String()
+		nsdType          = kingpin.Flag("type", "What nsd-like daemon to scrape (nsd or unbound). Defaults to nsd").Default("nsd").Enum("nsd", "unbound")
+		nsdAddr          = kingpin.Flag("control.address", "NSD or Unbound control socket address.").String()
+		cert             = kingpin.Flag("control.cert", "Client cert file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		key              = kingpin.Flag("control.key", "Client key file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		ca               = kingpin.Flag("control.ca", "Server CA file location. Mutually exclusive with --nsd.config.").ExistingFile()
+		toolkitFlags     = kingpinflag.AddFlags(kingpin.CommandLine, ":9167")
+	)
+
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	kingpin.Version(version.Print("nsd_exporter"))
+	kingpin.CommandLine.UsageWriter(os.Stdout)
+	kingpin.HelpFlag.Short('h')
+	kingpin.Parse()
+	logger := promlog.New(promlogConfig)
 
 	// Load config
-	err := loadConfig(*metricConfigPath, metricConfiguration)
+	err := config.LoadConfig(*metricConfigPath, metricConfiguration)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to load config", "err", err)
+		os.Exit(1)
 	}
 
 	// If one is set, all must be set.
@@ -235,20 +252,48 @@ func main() {
 			// Build from arguments
 			nsdCollector, err = NewNSDCollector(*nsdType, *nsdAddr, *ca, *key, *cert, false)
 			if err != nil {
-				log.Fatal(err)
+				slog.Error("Failed to create collector", "err", err)
+				os.Exit(1)
 			}
 		} else {
-			log.Fatal("-nsd-address, -cert, -key, and -ca must all be defined.")
+			slog.Error("--control.address, --control.cert, --control.key, and --control.ca must all be defined.")
+			os.Exit(1)
 		}
 	} else {
 		// Build from config
 		nsdCollector, err = NewNSDCollectorFromConfig(*nsdConfig)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("Failed to create collector", "err", err)
+			os.Exit(1)
 		}
 	}
+
+	_ = level.Info(logger).Log("msg", "Starting nsd_exporter", "version", version.Info())
+	_ = level.Info(logger).Log("msg", "Build context", "context", version.BuildContext())
+
 	prometheus.MustRegister(nsdCollector)
-	log.Println("Started.")
-	http.Handle(*metricPath, promhttp.Handler())
-	log.Fatal(http.ListenAndServe(*listenAddr, nil))
+	http.Handle(*metricsPath, promhttp.Handler())
+	if *metricsPath != "/" && *metricsPath != "" {
+		landingPage, err := web.NewLandingPage(
+			web.LandingConfig{
+				Name:        "NSd Exporter",
+				Description: "NSd Exporter for Prometheus",
+				Version:     version.Info(),
+				Links: []web.LandingLinks{
+					{Address: *metricsPath, Text: "Metrics"},
+				},
+			})
+		if err != nil {
+			slog.Error("Failed to create landing page", "err", err)
+			os.Exit(1)
+		}
+		http.Handle("/", landingPage)
+	}
+
+	server := new(http.Server)
+	err = web.ListenAndServe(server, toolkitFlags, logger)
+	if err != nil {
+		slog.Error("Server error", "err", err)
+		os.Exit(1)
+	}
 }

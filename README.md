@@ -8,17 +8,17 @@ You will need to launch the process as a user that has permissions to the NSD co
 
 ### Examples
 ```
-# Defaults listening to 127.0.0.1:8080/metrics
+# Defaults listening to 127.0.0.1:9167/metrics
 % nsd_exporter
 
 # Specify a different port to listen on
-% nsd_exporter -listen-address :9167
+% nsd_exporter --web.listen-address :9167
 
 # Specify an alternate configuration location to autodetect from
-% nsd_exporter -config-file /opt/nsd/nsd.conf
+% nsd_exporter --nsd.config /opt/nsd/nsd.conf
 
 # Manually specify NSD socket and certificates
-% nsd_exporter -ca /etc/nsd/nsd_server.pem -key /etc/nsd/nsd_control.key -cert /etc/nsd/nsd_control.pem -nsd-address 127.0.0.1:8952
+% nsd_exporter --control.ca /etc/nsd/nsd_server.pem --control.key /etc/nsd/nsd_control.key --control.cert /etc/nsd/nsd_control.pem --control.address 127.0.0.1:8952
 ```
 
 ### Add/Modify metrics
@@ -26,16 +26,10 @@ If `nsd` has a new version with new metrics or you want to change the descriptio
 
 1. Download the metrics config from [`config/config.yaml`](https://raw.githubusercontent.com/optix2000/nsd_exporter/master/config/config.yaml)
 2. Make any additions or modifications you want.
-3. Load it by running `nsd_exporter -metric-config my-custom-config.yaml`. This will use your config instead of the internal metrics config file.
+3. Load it by running `nsd_exporter --metrics-config my-custom-config.yaml`. This will use your config instead of the internal metrics config file.
 
 ## Building
-### Making config changes
-This is only needed if you want to modify the embedded metric configuration file.
 
-Install go-bindata.
 ```
-go install github.com/go-bindata/go-bindata/go-bindata@latest
+make
 ```
-Make any metric config modifications to `config/config.yaml`.
-
-Run `go generate` to generate a new embedded config file. Don't forget to check it in.
