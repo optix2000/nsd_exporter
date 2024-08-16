@@ -85,7 +85,7 @@ func (c *NSDCollector) Collect(ch chan<- prometheus.Metric) {
 			// Refetch metric
 			m, ok = c.metrics[metricName]
 			if !ok {
-				log.Println("Metric " + metricName + "not configured. Skipping")
+				log.Println("Metric " + metricName + " not configured. Skipping")
 			}
 			continue
 		}

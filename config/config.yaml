@@ -76,6 +76,12 @@ metrics:
   zone.slave:
     help: 'number of slave zones served. These are zones with "request-xfr" entries.'
     type: counter
+  zone.primary:
+    help: 'number of primary zones served. These are zones with no "request-xfr" entries. Same as zone.master.'
+    type: counter
+  zone.secondary:
+    help: 'number of secondary zones served. These are zones with "request-xfr" entries. Same as zone.slave.'
+    type: counter
 # Metrics that have labels based on some regex value
 # The capture group index should match the index of the label name under labels
 label_metrics:
