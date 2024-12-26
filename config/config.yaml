@@ -1,9 +1,6 @@
 metrics:
 # NSD Metrics
 # Taken from https://nsd.docs.nlnetlabs.nl/en/latest/manpages/nsd-control.html#statistics-counters
-  num.queries:
-    help: 'number of queries received (the tcp and udp queries added up).'
-    type: counter
   time.boot:
     help: 'uptime in seconds since the server was started. With fractional seconds.'
     type: gauge
@@ -25,81 +22,142 @@ metrics:
   size.config.mem:
     help: 'size of config data in memory, kept twice in server and xfrd process, in bytes.'
     type: gauge
-  num.edns:
-    help: 'number of queries with EDNS OPT.'
-    type: counter
-  num.ednserr:
-    help: 'number of queries which failed EDNS parse.'
-    type: counter
-  num.udp:
-    help: 'number of queries over UDP ip4.'
-    type: counter
-  num.udp6:
-    help: 'number of queries over UDP ip6.'
-    type: counter
-  num.tcp:
-    help: 'number of connections over TCP ip4.'
-    type: counter
-  num.tcp6:
-    help: 'number of connections over TCP ip6.'
-    type: counter
-  num.tls:
-    help: 'number of connections over TLS ip4. TLS queries are not part of num.tcp.'
-    type: counter
-  num.tls6:
-    help: 'number of connections over TLS ip6. TLS queries are not part of num.tcp6.'
-    type: counter
-  num.answer_wo_aa:
-    help: 'number of answers with NOERROR rcode and without AA flag, this includes the referrals.'
-    type: counter
-  num.rxerr:
-    help: 'number of queries for which the receive failed.'
-    type: counter
-  num.txerr:
-    help: 'number of answers for which the transmit failed.'
-    type: counter
-  num.raxfr:
-    help: 'number of AXFR requests from clients (that got served with reply).'
-    type: counter
-  num.rixfr:
-    help: 'number of IXFR requests from clients (that got served with reply).'
-    type: counter
-  num.truncated:
-    help: 'number of answers with TC flag set.'
-    type: counter
-  num.dropped:
-    help: 'number of queries that were dropped because they failed sanity check.'
-    type: counter
   zone.master:
     help: 'number of master zones served. These are zones with no "request-xfr" entries.'
     type: counter
   zone.slave:
     help: 'number of slave zones served. These are zones with "request-xfr" entries.'
     type: counter
+  zone.primary:
+    help: 'number of primary zones served. These are zones with no "request-xfr" entries. Same as zone.master.'
+    type: counter
+  zone.secondary:
+    help: 'number of secondary zones served. These are zones with "request-xfr" entries. Same as zone.slave.'
+    type: counter
 # Metrics that have labels based on some regex value
 # The capture group index should match the index of the label name under labels
 label_metrics:
-  num\.type\.(\w+):
+  ([\w\-\.]*)\.?num\.queries:
+    name: num_queries
+    labels:
+      - zone
+    help: 'number of queries received (the tcp and udp queries added up).'
+    type: counter
+  ([\w\-\.]*)\.?num.edns$:
+    name: num_edns
+    labels:
+      - zone
+    help: 'number of queries with EDNS OPT.'
+    type: counter
+  ([\w\-\.]*)\.?num.ednserr:
+    name: num_ednserr
+    labels:
+      - zone
+    help: 'number of queries which failed EDNS parse.'
+    type: counter
+  ([\w\-\.]*)\.?num\.udp$:
+    name: num_udp
+    labels:
+      - zone
+    help: 'number of queries over UDP ip4.'
+    type: counter
+  ([\w\-\.]*)\.?num\.udp6:
+    name: num_upd6
+    labels:
+      - zone
+    help: 'number of queries over UDP ip6.'
+    type: counter
+  ([\w\-\.]*)\.?num\.tcp$:
+    name: num_tcp
+    labels:
+      - zone
+    help: 'number of connections over TCP ip4.'
+    type: counter
+  ([\w\-\.]*)\.?num\.tcp6:
+    name: num_tcp6
+    labels:
+      - zone
+    help: 'number of connections over TCP ip6.'
+    type: counter
+  ([\w\-\.]*)\.?num\.tls$:
+    name: num_tls
+    labels:
+      - zone
+    help: 'number of connections over TLS ip4. TLS queries are not part of num.tcp.'
+    type: counter
+  ([\w\-\.]*)\.?num\.tls6:
+    name: num_tls6
+    labels:
+      - zone
+    help: 'number of connections over TLS ip6. TLS queries are not part of num.tcp6.'
+    type: counter
+  ([\w\-\.]*)\.?num\.answer_wo_aa:
+    name: num_answer_wo_aa
+    labels:
+      - zone
+    help: 'number of answers with NOERROR rcode and without AA flag, this includes the referrals.'
+    type: counter
+  ([\w\-\.]*)\.?num\.rxerr:
+    name: num_rxerr
+    labels:
+      - zone
+    help: 'number of queries for which the receive failed.'
+    type: counter
+  ([\w\-\.]*)\.?num\.txerr:
+    name: num_txerr
+    labels:
+      - zone
+    help: 'number of answers for which the transmit failed.'
+    type: counter
+  ([\w\-\.]*)\.?num\.raxfr:
+    name: num_raxfr
+    labels:
+      - zone
+    help: 'number of AXFR requests from clients (that got served with reply).'
+    type: counter
+  ([\w\-\.]*)\.?num\.rixfr:
+    name: num_rixfr
+    labels:
+      - zone
+    help: 'number of IXFR requests from clients (that got served with reply).'
+    type: counter
+  ([\w\-\.]*)\.?num\.truncated:
+    name: num_truncated
+    labels:
+      - zone
+    help: 'number of answers with TC flag set.'
+    type: counter
+  ([\w\-\.]*)\.?num\.dropped:
+    name: num_dropped
+    labels:
+      - zone
+    help: 'number of queries that were dropped because they failed sanity check.'
+    type: counter
+  ([\w\-\.]*)\.?num\.type\.([\w\-]+):
     name: num_type
     labels:
+      - zone
       - type
     help: 'number of queries with this query type.'
     type: counter
-  num\.opcode\.(\w+):
+  ([\w\-\.]*)\.?num\.opcode\.(\w+):
     name: num_opcode
     labels:
+      - zone
       - type
     help: 'number of queries with this opcode.'
     type: counter
-  num\.class\.(\w+):
+  ([\w\-\.]*)\.?num\.class\.(\w+):
     name: num_class
     labels:
+      - zone
       - class
     help: 'number of queries with this query class.'
     type: counter
-  num\.rcode\.(\w+):
+  ([\w\-\.]*)\.?num\.rcode\.(\w+):
     name: num_rcode
     labels:
+      - zone
       - rcode
     help: 'number of answers that carried this return code.'
     type: counter
